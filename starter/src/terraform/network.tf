@@ -2,7 +2,8 @@
 locals {
   cidr_vcn = "10.0.0.0/16"
   cidr_public_subnet = "10.0.1.0/24"
-  cidr_private_subnet =  "10.0.2.0/24"
+  cidr_db_subnet =  "10.0.2.0/24"
+  cidr_app_subnet =  "10.0.3.0/24"
 }
 
 resource "oci_core_vcn" "starter_vcn" {
@@ -47,7 +48,7 @@ resource "oci_core_subnet" "starter_public_subnet" {
 
 # App Subnet
 resource "oci_core_subnet" "starter_app_subnet" {
-  cidr_block        = local.cidr_private_subnet
+  cidr_block        = local.cidr_app_subnet
   display_name      = "${var.prefix}-app-subnet"
   dns_label         = "${var.prefix}app"
   security_list_ids = [oci_core_vcn.starter_vcn.default_security_list_id, oci_core_security_list.starter_security_list.id]
@@ -61,7 +62,7 @@ resource "oci_core_subnet" "starter_app_subnet" {
 
 # Db Subnet
 resource "oci_core_subnet" "starter_db_subnet" {
-  cidr_block        = local.cidr_private_subnet
+  cidr_block        = local.cidr_db_subnet
   display_name      = "${var.prefix}-db-subnet"
   dns_label         = "${var.prefix}db"
   security_list_ids = [oci_core_vcn.starter_vcn.default_security_list_id, oci_core_security_list.starter_security_list.id]
