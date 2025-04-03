@@ -60,14 +60,13 @@ build_function() {
      fn bump
      export TF_VAR_fn_image=`grep "built successfully" $TARGET_DIR/fn_build.log | sed "s/Function //" | sed "s/ built successfully.//"`
      # Push the image to docker
-     docker login ${TF_VAR_ocir} -u ${TF_VAR_namespace}/${TF_VAR_username} -p "${TF_VAR_auth_token}"
+     oci raw-request --region $TF_VAR_region --http-method GET --target-uri "https://${TF_VAR_ocir}/20180419/docker/token" | jq -r .data.token | docker login -u BEARER_TOKEN --password-stdin ${TF_VAR_ocir}
      exit_on_error
      docker push $TF_VAR_fn_image
      exit_on_error
      # Store the image name and DB_URL in files
-     echo > $TARGET_DIR/fn_image.txt
+     echo $TF_VAR_fn_image > $TARGET_DIR/fn_image.txt
      echo "$1" > $TARGET_DIR/fn_db_url.txt
-     . ../../env.sh
   else 
      echo "build_function - built successfully not found"
      exit 1
@@ -88,15 +87,25 @@ create_kubeconfig() {
 
 ocir_docker_push () {
   # Docker Login
-  docker login ${TF_VAR_ocir} -u ${TF_VAR_namespace}/${TF_VAR_username} -p "${TF_VAR_auth_token}"
+  oci raw-request --region $TF_VAR_region --http-method GET --target-uri "https://${TF_VAR_ocir}/20180419/docker/token" | jq -r .data.token | docker login -u BEARER_TOKEN --password-stdin ${TF_VAR_ocir}
+  exit_on_error
   echo DOCKER_PREFIX=$DOCKER_PREFIX
 
   # Push image in registry
-  docker tag ${TF_VAR_prefix}-app ${DOCKER_PREFIX}/${TF_VAR_prefix}-app:latest
-  docker push ${DOCKER_PREFIX}/${TF_VAR_prefix}-app:latest
+  if [ -n "$(docker images -q ${TF_VAR_prefix}-app 2> /dev/null)" ]; then
+    docker tag ${TF_VAR_prefix}-app ${DOCKER_PREFIX}/${TF_VAR_prefix}-app:latest
+    docker push ${DOCKER_PREFIX}/${TF_VAR_prefix}-app:latest
+    exit_on_error
+    echo "${DOCKER_PREFIX}/${TF_VAR_prefix}-app:latest" > $TARGET_DIR/docker_image_app.txt
+  fi
 
-  docker tag ${TF_VAR_prefix}-ui ${DOCKER_PREFIX}/${TF_VAR_prefix}-ui:latest
-  docker push ${DOCKER_PREFIX}/${TF_VAR_prefix}-ui:latest
+  # Push image in registry
+  if [ -d $PROJECT_DIR/src/ui ]; then
+    docker tag ${TF_VAR_prefix}-ui ${DOCKER_PREFIX}/${TF_VAR_prefix}-ui:latest
+    docker push ${DOCKER_PREFIX}/${TF_VAR_prefix}-ui:latest
+    exit_on_error
+    echo "${DOCKER_PREFIX}/${TF_VAR_prefix}-ui:latest" > $TARGET_DIR/docker_image_ui.txt
+  fi
 }
 
 replace_db_user_password_in_file() {

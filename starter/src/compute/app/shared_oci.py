@@ -34,7 +34,7 @@ def log_in_file(prefix, value):
     if os.path.isdir(LOG_DIR) == False:
         os.mkdir(LOG_DIR)     
     filename = LOG_DIR+"/"+prefix+"_"+UNIQUE_ID+".txt"
-    with open(filename, "w") as text_file:
+    with open(filename, "w", encoding="utf-8") as text_file:
         text_file.write(value)
     log("log file: " +filename )  
 
@@ -349,7 +349,7 @@ def invokeTika(value):
         "creationDate": UNIQUE_ID,
         "author": dictString(j,"Author"),
         "publisher": dictString(j,"publisher"),
-        "content": j["content"],
+        "content": j["content"].encode('iso-8859-1').decode('utf-8'),
         "path": resourceId
     }
     log( "</invokeTika>")
@@ -634,14 +634,7 @@ def sitemap(value):
                     if last_char == '/':
                         pdf_path = pdf_path[:-1]
 
-                    pdf_path = pdf_path.replace('/', '___');
-                    # pdf_path = pdf_path.replace('https://', '');
-                    # pdf_path = pdf_path.replace('/', '_');
-                    # pdf_path = pdf_path.replace('.', '_');
-                    # pdf_path = pdf_path.replace('-', '_');
-                    # pdf_path = pdf_path.replace('?', '_');
-                    # pdf_path = pdf_path.replace('=', '_');
-                    # pdf_path = pdf_path.replace('&', '_');                    
+                    pdf_path = pdf_path.replace('/', '___');                   
                     pdf_path = pdf_path+'.pdf'
                     log("<sitemap>"+full_uri)
                     pdfkit.from_url(full_uri, LOG_DIR+"/"+pdf_path)
@@ -649,7 +642,7 @@ def sitemap(value):
  
                     # Upload to object storage as "site/"+pdf_path
                     with open(LOG_DIR+"/"+pdf_path, 'rb') as f2:
-                        obj = os_client.put_object(namespace_name=namespace, bucket_name=bucketName, object_name=prefix+"/"+pdf_path, put_object_body=f2)
+                        obj = os_client.put_object(namespace_name=namespace, bucket_name=bucketName, object_name=prefix+"/"+pdf_path, put_object_body=f2, metadata='{"customized_url_source": "'+ full_uri + '"}')
                         fileList.append( prefix+"/"+pdf_path )
                     
                 except Exception as e:
@@ -748,6 +741,7 @@ def upload_genai_bucket(value, content=None):
     namespace = value["data"]["additionalDetails"]["namespace"]
     bucketName = value["data"]["additionalDetails"]["bucketName"]
     bucketGenAI = bucketName.replace("-public-bucket","-agent-bucket")
+    resourceId = value["data"]["resourceId"]
     resourceName = value["data"]["resourceName"]
     resourceGenAI = resourceName
 
@@ -765,8 +759,10 @@ def upload_genai_bucket(value, content=None):
 
     upload_manager = oci.object_storage.UploadManager(os_client, max_parallel_uploads=10)
     part_size = 2 * MEBIBYTE
-    upload_manager.upload_file(namespace_name=namespace, bucket_name=bucketGenAI, object_name=resourceGenAI, file_path=file_name, part_size=part_size)
-    log( "</upload_genai_bucket>")            
+    object_url = "https://"+namespace+".objectstorage."+signer.region+".oci.customer-oci.com/"+resourceId
+    log( "<upload_genai_bucket>object_url="+object_url )
+    upload_manager.upload_file(namespace_name=namespace, bucket_name=bucketGenAI, object_name=resourceGenAI, file_path=file_name, part_size=part_size, metadata='{"customized_url_source": "'+ object_url + '"}')
+    log( "</upload_genai_bucket>" )            
 
 ## -- delete_genai_bucket ------------------------------------------------------------------
 
