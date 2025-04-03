@@ -68,10 +68,10 @@ def insertDocument(value):
                 
 ## -- deleteDocument --------------------------------------------------------
 
-def deleteDocument(value):
+def deleteDocument(path):
     log( "<deleteDocument>")
-    resourceId = value["data"]["resourceId"]
-    shared_db.deleteDoc(resourceId)
+    # resourceId = value["data"]["resourceId"]
+    shared_db.deleteDoc(path)
     log( "</deleteDocument>")
 
 ## -- updateCount ------------------------------------------------------------------

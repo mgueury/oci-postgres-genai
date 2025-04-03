@@ -27,6 +27,7 @@ def closeDbConn():
 # -- createDoc -----------------------------------------------------------------
 
 def createDoc(result):  
+    log(f"<createDoc>")
     result["summaryEmbed"] = shared_oci.embedText(result["summary"])        
     insertDocs( result )
     for pageNumber in result["pages"]:
@@ -36,10 +37,12 @@ def createDoc(result):
             c["cohereEmbed"] = shared_oci.embedText(c["chunck"])
             insertDocsChunck(result,c,pageNumber)
     shared_langchain.insertDocsChunck(result)     
+    log(f"</createDoc>")
 
 # -- insertDocs -----------------------------------------------------------------
 
 def insertDocs(result ):  
+    log(f"<insertDocs>")
     global dbConn
     cur = dbConn.cursor()
     stmt = """
@@ -84,10 +87,12 @@ def insertDocs(result ):
         # Close the cursor and connection
         if cur:
             cur.close()
+    log(f"</insertDocs>")
 
 # -- insertDocsChunck -----------------------------------------------------------------
 
 def insertDocsChunck(result,c,pageNumber):  
+    log(f"<insertDocsChunck>")
     global dbConn
     cur = dbConn.cursor()
     stmt = """
@@ -121,6 +126,7 @@ def insertDocsChunck(result,c,pageNumber):
         # Close the cursor and connection
         if cur:
             cur.close()
+    log(f"</insertDocsChunck>")
 
 # -- deleteDoc -----------------------------------------------------------------
 
