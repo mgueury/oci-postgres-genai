@@ -19,7 +19,7 @@ resource "oci_identity_policy" "starter_search_policy" {
     compartment_id = local.lz_serv_cmp_ocid
 
     statements = [
-        "allow any-user to manage objects in compartment id ${local.lz_serv_cmp_ocid} where request.principal.id='${oci_functions_function.starter_fn_function.id}'",
+        "allow any-user to manage objects in compartment id ${local.lz_serv_cmp_ocid} where request.principal.id='${oci_functions_function.starter_fn_function[0].id}'",
         "allow any-user to manage all-resources in compartment id ${local.lz_serv_cmp_ocid} where request.principal.id='${oci_core_instance.starter_bastion.id}'",
         "allow any-user to manage stream-family in compartment id ${local.lz_serv_cmp_ocid} where request.principal.id='${oci_core_instance.starter_bastion.id}'"
         # "Allow dynamic-group ${var.idcs_domain_name}/${var.prefix}-fn-dyngroup to manage objects in compartment id ${var.compartment_ocid}",
