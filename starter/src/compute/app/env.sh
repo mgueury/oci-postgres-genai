@@ -1,7 +1,6 @@
 export DB_USER="##DB_USER##"
 export DB_PASSWORD="##DB_PASSWORD##"
-# export DB_URL="##DB_URL##"
-export DB_URL="127.0.0.1"
+export DB_URL="##DB_URL##"
 export PGPASSWORD=$DB_PASSWORD
 
 export STREAM_OCID="##STREAM_OCID##"
