@@ -39,3 +39,27 @@ locals {
     // jdbc:postgresql://localhost:5432/postgres
     jdbc_url = format("jdbc:postgresql://%s:%s/postgres", local.db_host, local.db_port )
 }  
+
+
+resource "oci_psql_configuration" "starter_psql_configuration" {
+    #Required
+    compartment_id = local.lz_db_cmp_ocid
+    db_configuration_overrides {
+        #Required
+    #        #Required
+    #        config_key = var.configuration_db_configuration_overrides_items_config_key
+    #        overriden_config_value = var.configuration_db_configuration_overrides_items_overriden_config_value
+    #    }
+        items {
+          config_key = "oci.admin_enabled_extensions",
+          overriden_config_value = "vector"
+        }    
+    }
+    db_version = "15"
+    display_name = "${var.prefix}-psql-config"
+    shape = "VM.Standard.E4.Flex"
+
+    #Optional
+    freeform_tags = local.freeform_tags
+    is_flexible = true
+}
