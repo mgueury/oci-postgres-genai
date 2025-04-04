@@ -1,3 +1,4 @@
+# XXXX Not used XXXX
 # Install PostgreSQL 16
 # To run with root
 dnf module list postgresql
