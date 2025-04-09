@@ -75,8 +75,8 @@ build_function() {
   # First create the Function using terraform
   # Run env.sh to get function image 
   cd $PROJECT_DIR
-  . env.sh 
-  src/terraform/apply.sh --auto-approve
+  . starter.sh env 
+  $BIN_DIR/terraform_apply.sh --auto-approve
 }
 
 # Create KUBECONFIG file
@@ -269,14 +269,23 @@ get_user_details() {
 
 # Get the user interface URL
 get_ui_url() {
-  if [ "$TF_VAR_deploy_type" == "compute" ]; then
+  if [ "$TF_VAR_deploy_type" == "public_compute" ] || [ "$TF_VAR_deploy_type" == "private_compute" ] ; then
     if [ "$TF_VAR_tls" != "" ] && [ "$TF_VAR_tls" == "existing_ocid" ]; then
+      # xx APEX ? xx
       export UI_URL=https://${TF_VAR_dns_name}/${TF_VAR_prefix}
     else 
-      export UI_URL=http://${COMPUTE_IP}
+      if [ "$TF_VAR_deploy_type" == "public_compute" ]; then
+        export UI_URL=http://${COMPUTE_IP}
+      else 
+        export UI_URL=https://${APIGW_HOSTNAME}/${TF_VAR_prefix}
+      fi    
       if [ "$TF_VAR_tls" != "" ] && [ "$TF_VAR_certificate_ocid" != "" ]; then
         export UI_HTTP=$UI_URL
-        export UI_URL=https://${TF_VAR_dns_name}
+        if [ "$TF_VAR_deploy_type" == "public_compute" ]; then
+            export UI_URL=https://${TF_VAR_dns_name}
+        else 
+            export UI_URL=https://${TF_VAR_dns_name}/${TF_VAR_prefix}
+        fi    
       fi
     fi  
   elif [ "$TF_VAR_deploy_type" == "instance_pool" ]; then
@@ -303,7 +312,7 @@ get_ui_url() {
 }
 
 is_deploy_compute() {
-  if [ "$TF_VAR_deploy_type" == "compute" ] || [ "$TF_VAR_deploy_type" == "instance_pool" ]; then
+  if [ "$TF_VAR_deploy_type" == "public_compute" ] || [ "$TF_VAR_deploy_type" == "private_compute" ] || [ "$TF_VAR_deploy_type" == "instance_pool" ]; then
     return 0
   else
     return 1
@@ -311,9 +320,9 @@ is_deploy_compute() {
 }
 
 livelabs_green_button() {
-  # Lot of tests to be sure we are in a empty Green Button LiveLabs
+  # Lot of tests to be sure we are in an Green Button LiveLabs
   # compartment_ocid still undefined ? 
-  if grep -q '# export TF_VAR_compartment_ocid=ocid1.compartment.xxxxx' $PROJECT_DIR/env.sh; then
+  if grep -q 'export TF_VAR_compartment_ocid="__TO_FILL__"' $PROJECT_DIR/env.sh; then
     # vnc_ocid still undefined ? 
     if [ "$TF_VAR_vcn_ocid" != "__TO_FILL__" ]; then
       # Variables already set
@@ -346,7 +355,7 @@ livelabs_green_button() {
     echo TF_VAR_compartment_ocid=$TF_VAR_compartment_ocid
 
     if [ "$TF_VAR_compartment_ocid" != "" ]; then
-      sed -i "s&# export TF_VAR_compartment_ocid=ocid1.compartment.xxxxx&export TF_VAR_compartment_ocid=\"$TF_VAR_compartment_ocid\"&" $PROJECT_DIR/env.sh
+      sed -i "s&export TF_VAR_compartment_ocid=\"__TO_FILL__\"&export TF_VAR_compartment_ocid=\"$TF_VAR_compartment_ocid\"&" $PROJECT_DIR/env.sh
       echo "TF_VAR_compartment_ocid stored in env.sh"
     fi  
 
@@ -360,14 +369,14 @@ livelabs_green_button() {
     export TF_VAR_subnet_ocid=`oci network subnet list --compartment-id $TF_VAR_compartment_ocid | jq -c -r '.data[].id'`
     echo TF_VAR_subnet_ocid=$TF_VAR_subnet_ocid  
     if [ "$TF_VAR_subnet_ocid" != "" ]; then
-      sed -i "s&TF_VAR_public_subnet_ocid=\"__TO_FILL__\"&TF_VAR_public_subnet_ocid=\"$TF_VAR_subnet_ocid\"&" $PROJECT_DIR/env.sh
+      sed -i "s&TF_VAR_web_subnet_ocid=\"__TO_FILL__\"&TF_VAR_web_subnet_ocid=\"$TF_VAR_subnet_ocid\"&" $PROJECT_DIR/env.sh
       sed -i "s&TF_VAR_app_subnet_ocid=\"__TO_FILL__\"&TF_VAR_app_subnet_ocid=\"$TF_VAR_subnet_ocid\"&" $PROJECT_DIR/env.sh
       sed -i "s&TF_VAR_db_subnet_ocid=\"__TO_FILL__\"&TF_VAR_db_subnet_ocid=\"$TF_VAR_subnet_ocid\"&" $PROJECT_DIR/env.sh
       echo "TF_VAR_subnet_ocid stored in env.sh"
       # Set the real variables such that the first "build" works too.
-      export TF_VAR_public_subnet_ocid=$TF_VAR_subnet_ocid
+      export TF_VAR_web_subnet_ocid=$TF_VAR_subnet_ocid
       export TF_VAR_app_subnet_ocid=$TF_VAR_subnet_ocid
-      export TF_VAR_db_subnet_ocid=$TF_VAR_subnet_ocid      
+      export TF_VAR_db_subnet_ocid=$TF_VAR_subnet_ocid
     fi  
     
     # LiveLabs support only E4 Shapes
@@ -520,7 +529,7 @@ certificate_dir_before_terraform() {
     export TF_VAR_certificate_dir=$PROJECT_DIR/src/tls/$TF_VAR_dns_name
   fi
 
-  if [ "$TF_VAR_deploy_type" == "compute" ]; then
+  if [ "$TF_VAR_deploy_type" == "public_compute" ] || [ "$TF_VAR_deploy_type" == "private_compute" ]; then
     if [ -d target/compute/certificate ]; then
       echo "Certificate Directory exists already" 
     elif [ "$TF_VAR_certificate_dir" != "" ]; then
@@ -537,7 +546,7 @@ certificate_dir_before_terraform() {
   elif [ "$TF_VAR_deploy_type" == "kubernetes" ]; then
     if [ "$TF_VAR_tls" == "new_http_01" ]; then
       echo "New Certificate will be created after the deployment."      
-    elif [ "$TF_VAR_certificate_dir" != "" ]; then
+    elif [ "$TF_VAR_certificate_dir" == "" ]; then
       echo "ERROR: kubernetes: certificate_dir_before_terraform: missing variables TF_VAR_certificate_dir"
       exit 1
     fi    
@@ -553,7 +562,7 @@ certificate_dir_before_terraform() {
 # Certificate - Post Deploy
 certificate_post_deploy() {
   if [ "$TF_VAR_tls" == "new_http_01" ]; then
-    if [ "$TF_VAR_deploy_type" == "compute" ]; then
+    if [ "$TF_VAR_deploy_type" == "public_compute" ] || [ "$TF_VAR_deploy_type" == "private_compute" ]; then
       certificate_run_certbot_http_01
     elif [ "$TF_VAR_deploy_type" == "kubernetes" ]; then
       echo "Skip: TLS - Kubernetes - HTTP_01"
@@ -561,7 +570,7 @@ certificate_post_deploy() {
   elif [ "$TF_VAR_deploy_type" == "kubernetes"  ]; then
     # Set the TF_VAR_ingress_ip
     get_ui_url 
-    src/terraform/apply.sh --auto-approve -no-color
+    $BIN_DIR/terraform_apply.sh --auto-approve -no-color
     exit_on_error
   fi  
 }
@@ -574,10 +583,60 @@ certificate_run_certbot_http_01()
   fi   
 
   # Generate the certificate with Let'Encrypt on the COMPUTE
-  scp -r -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path src/tls opc@$COMPUTE_IP:/home/opc/.
-  exit_on_error
-  ssh -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path opc@$COMPUTE_IP "export TF_VAR_dns_name=\"$TF_VAR_dns_name\";export TF_VAR_certificate_email=\"$TF_VAR_certificate_email\"; bash tls/certbot_http_01.sh 2>&1 | tee -a tls/certbot_http_01.log"
-  scp -r -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path opc@$COMPUTE_IP:tls/certificate target/.
-  exit_on_error
+  scp_via_bastion src/tls opc@$COMPUTE_IP:/home/opc/.
+  ssh -o StrictHostKeyChecking=no -oProxyCommand="$BASTION_PROXY_COMMAND" opc@$COMPUTE_IP "export TF_VAR_dns_name=\"$TF_VAR_dns_name\";export TF_VAR_certificate_email=\"$TF_VAR_certificate_email\"; bash tls/certbot_http_01.sh 2>&1 | tee -a tls/certbot_http_01.log"
+  scp_via_bastion opc@$COMPUTE_IP:tls/certificate target/.
   export TF_VAR_certificate_dir=$PROJECT_DIR/target/certificate/$TF_VAR_dns_name
 }
+
+# SCP via Bastion
+function scp_via_bastion() {
+  eval "$(ssh-agent -s)"
+  ssh-add $TF_VAR_ssh_private_path
+
+  # Try 5 times to copy the files / wait 5 secs between each try
+  echo "scp_via_bastion"
+  i=0
+  while [ true ]; do
+    if command -v rsync &> /dev/null; then
+      # Using RSYNC allow to reapply the same command several times easily. 
+      rsync -av -e "ssh -o StrictHostKeyChecking=no -oProxyCommand=\"$BASTION_PROXY_COMMAND\"" $1 $2
+    else
+      scp -r -o StrictHostKeyChecking=no -oProxyCommand="$BASTION_PROXY_COMMAND" $1 $2
+    fi  
+    if [ $? -eq 0 ]; then
+      echo "-- done"
+      break;
+    elif [ "$i" == "5" ]; then
+      echo "scp_via_bastion: Maximum number of scp retries, ending."
+      error_exit
+    fi
+  sleep 5
+  i=$(($i+1))
+  done
+}
+
+# Function to replace ##VARIABLES## in a file
+file_replace_variables() {
+  local file="$1"
+  local temp_file=$(mktemp)
+
+  while IFS= read -r line; do
+    while [[ $line =~ (.*)##(.*)##(.*) ]]; do
+      local var_name="${BASH_REMATCH[2]}"
+      local var_value="${!var_name}"
+
+      if [[ -z "$var_value" ]]; then
+        echo "ERROR: Environment variable '${var_name}' is not defined."
+        error_exit
+      fi
+
+      line=${line/"##${var_name}##"/${var_value}}
+    done
+
+    echo "$line" >> "$temp_file"
+  done < "$file"
+
+  mv "$temp_file" "$file"
+}
+

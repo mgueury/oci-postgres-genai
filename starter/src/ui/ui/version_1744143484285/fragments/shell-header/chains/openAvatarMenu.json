@@ -1,0 +1,17 @@
+{
+  "description": "",
+  "root": "avatarmenuOpen",
+  "actions": {
+    "avatarmenuOpen": {
+      "module": "vb/action/builtin/callComponentMethodAction",
+      "parameters": {
+        "component": "[[document.getElementById('header-avatar-menu')]]",
+        "method": "open",
+        "params": [
+          "#header-avatar"
+        ]
+      }
+    }
+  },
+  "variables": {}
+}

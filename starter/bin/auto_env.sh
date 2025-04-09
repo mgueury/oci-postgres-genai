@@ -1,11 +1,37 @@
 #!/bin/bash
 
-# Autocompletion in bash
+# PROJECT_DIR
+if [[ -z "${PROJECT_DIR}" ]]; then
+  echo "ERROR: PROJECT_DIR not set"
+  exit 1
+fi
+# TARGET_DIR
+export TARGET_DIR=$PROJECT_DIR/target
+export STATE_FILE=$TARGET_DIR/terraform.tfstate
+if [ ! -d $TARGET_DIR ]; then
+  mkdir $TARGET_DIR
+fi
+# BIN_DIR
+if [[ -z "${BIN_DIR}" ]]; then
+  export BIN_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+fi
+
+# ENV.SH
+. $PROJECT_DIR/env.sh
+
+# Autocomplete in bash
 _starter_completions()
 {
   COMPREPLY=($(compgen -W "build ssh terraform destroy generate deploy env help" "${COMP_WORDS[1]}"))
 }
 complete -F _starter_completions ./starter.sh
+
+# group_common_env.sh
+if [ -f $PROJECT_DIR/../group_common_env.sh ]; then
+  . $PROJECT_DIR/../group_common_env.sh
+elif [ -f $PROJECT_DIR/../../group_common_env.sh ]; then
+  . $PROJECT_DIR/../../group_common_env.sh
+fi
 
 # Check the SHAPE
 unset MISMATCH_PLATFORM
@@ -46,19 +72,6 @@ fi
 if [ "$0" != "-bash" ]; then
   unset HISTFILE
   set -o history -o histexpand
-fi
-
-if [[ -z "${BIN_DIR}" ]]; then
-  export BIN_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-fi
-if [[ -z "${PROJECT_DIR}" ]]; then
-  error_exit "PROJECT_DIR not set"
-fi
-
-# Target DIR
-export TARGET_DIR=$PROJECT_DIR/target
-if [ ! -d $TARGET_DIR ]; then
-  mkdir $TARGET_DIR
 fi
 
 # Shared BASH Functions
@@ -137,6 +150,9 @@ else
   auto_echo TF_VAR_compartment_ocid=$TF_VAR_compartment_ocid
   auto_echo TF_VAR_region=$TF_VAR_region
 
+  # DATE_POSTFIX (used for logs names)
+  DATE_POSTFIX=`date '+%Y%m%d-%H%M%S'`
+
   # Kubernetes and OCIR
   if [ "$TF_VAR_deploy_type" == "kubernetes" ] || [ "$TF_VAR_deploy_type" == "function" ] || [ "$TF_VAR_deploy_type" == "container_instance" ] || [ -f $PROJECT_DIR/src/terraform/oke.tf ]; then
     export TF_VAR_namespace=`oci os ns get | jq -r .data`
@@ -209,24 +225,20 @@ fi
 
 
 #-- POST terraform ----------------------------------------------------------
-export STATE_FILE=$TARGET_DIR/terraform.tfstate
 if [ -f $STATE_FILE ]; then
   # OBJECT_STORAGE_URL
   export OBJECT_STORAGE_URL=https://objectstorage.${TF_VAR_region}.oraclecloud.com
 
-  # API GW
-  if [ "$TF_VAR_deploy_type" == "function" ] || [ "$TF_VAR_deploy_type" == "container_instance" ] || [ "$TF_VAR_ui_type" == "api" ]; then
-    # APIGW URL
-    get_attribute_from_tfstate "APIGW_HOSTNAME" "starter_apigw" "hostname"
-    # APIGW Deployment id
-    get_attribute_from_tfstate "APIGW_DEPLOYMENT_OCID" "starter_apigw_deployment" "id"
-  fi
-
+  # APIGW URL - not always used
+  get_attribute_from_tfstate "APIGW_HOSTNAME" "starter_apigw" "hostname"
+  # APIGW Deployment id
+  get_attribute_from_tfstate "APIGW_DEPLOYMENT_OCID" "starter_apigw_deployment" "id"
+ 
   # Instance Pool
   if [ "$TF_VAR_deploy_type" == "instance_pool" ]; then
     # XXX Does not work with Resource Manager XXX
     # Check in the terraform state is the compute is already created.
-    get_id_from_tfstate "COMPUTE_OCID" "starter_instance"
+    get_id_from_tfstate "COMPUTE_OCID" "starter_compute"
     if [ "$COMPUTE_OCID" != "" ]; then
       export TF_VAR_compute_ready="true"
     fi
@@ -251,17 +263,15 @@ if [ -f $STATE_FILE ]; then
 
   # Container Instance
   if [ "$TF_VAR_deploy_type" == "container_instance" ]; then
-    if [ -f $TARGET_DIR/docker_image_ui.txt ] || [ -f $TARGET_DIR/docker_image_app.txt ] ; then
-      if [ -f $TARGET_DIR/docker_image_ui.txt ]; then
-        export TF_VAR_docker_image_ui=`cat $TARGET_DIR/docker_image_ui.txt`
-      else
-        export TF_VAR_docker_image_ui="busybox"      
-      fi
-      if [ -f $TARGET_DIR/docker_image_app.txt ]; then
-        export TF_VAR_docker_image_app=`cat $TARGET_DIR/docker_image_app.txt`
-      else
-        export TF_VAR_docker_image_app="busybox"      
-      fi
+    if [ -f $TARGET_DIR/docker_image_ui.txt ]; then
+      export TF_VAR_docker_image_ui=`cat $TARGET_DIR/docker_image_ui.txt`
+    else
+      export TF_VAR_docker_image_ui="busybox"      
+    fi
+    if [ -f $TARGET_DIR/docker_image_app.txt ]; then
+      export TF_VAR_docker_image_app=`cat $TARGET_DIR/docker_image_app.txt`
+    else
+      export TF_VAR_docker_image_app="busybox"      
     fi
   fi
 
@@ -270,6 +280,22 @@ if [ -f $STATE_FILE ]; then
   
   # Bastion 
   get_output_from_tfstate "BASTION_IP" "bastion_public_ip"
+
+  # Check if there is a BASTION SERVICE with a BASTION COMMAND
+  get_output_from_tfstate "BASTION_COMMAND" "bastion_command"
+  if [ "$BASTION_COMMAND" == "" ]; then
+    if [ "$TF_VAR_deploy_type" == "public_compute" ]; then
+      # Ideally BASTION_PROXY_COMMAND should be not used. But passing a empty value does not work...
+      export COMPUTE_IP=$BASTION_IP
+    fi
+    export BASTION_USER_HOST="opc@$BASTION_IP"
+    export BASTION_PROXY_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p $BASTION_USER_HOST"
+  else 
+    # export Ex: BASTION_COMMAND="ssh -i <privateKey>-o ProxyCommand=\"ssh -i <privateKey> -W %h:%p -p 22 ocid1.bastionsession.oc1.eu-frankfurt-1.xxxxxxxx@host.bastion.eu-frankfurt-1.oci.oraclecloud.com\" -p 22 opc@10.0.1.97"
+    export BASTION_USER_HOST=`echo $BASTION_COMMAND | sed "s/.*ocid1.bastionsession/ocid1.bastionsession/" | sed "s/oci\.oraclecloud\.com.*/oci\.oraclecloud\.com/"`
+    export BASTION_IP=`echo $BASTION_COMMAND | sed "s/.*opc@//"`
+    export BASTION_PROXY_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p $BASTION_USER_HOST"
+  fi
 
   # JDBC_URL
   get_output_from_tfstate "JDBC_URL" "jdbc_url"

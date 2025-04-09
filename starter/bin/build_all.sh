@@ -1,14 +1,24 @@
 #!/bin/bash
-if [[ -z "${PROJECT_DIR}" ]]; then
-  echo "Error: PROJECT_DIR not set"
-  exit
+if [ "$PROJECT_DIR" = "" ]; then
+  echo "Error: PROJECT_DIR not set. Please use ./starter.sh build"
+  exit 1
 fi
 cd $PROJECT_DIR
 SECONDS=0
 
-. env.sh -no-auto
+. starter.sh env -no-auto
 title "OCI Starter - Build"
 
+# First build is auto-approved. Else you need to pass --auto-approve flag.
+if [ "$1" == "--auto-approve" ]; then
+   export TERRAFORM_FLAG="--auto-approve"
+elif [ -f $STATE_FILE ]; then
+   echo "$STATE_FILE detected."
+else
+   export TERRAFORM_FLAG="--auto-approve"
+fi
+
+# Custom code before build
 if [ -f $PROJECT_DIR/src/before_build.sh ]; then
   $PROJECT_DIR/src/before_build.sh
 fi
@@ -19,19 +29,19 @@ if [ "$TF_VAR_ssh_private_path" == "" ]; then
   . $BIN_DIR/sshkey_generate.sh
 fi
 
-. env.sh
+. starter.sh env
 if [ "$TF_VAR_tls" != "" ]; then
   title "Certificate"
   certificate_dir_before_terraform
 fi  
 
 title "Terraform Apply"
-src/terraform/apply.sh --auto-approve -no-color
+$BIN_DIR/terraform_apply.sh -no-color $TERRAFORM_FLAG
 exit_on_error
 
-. env.sh
+. starter.sh env
 # Run config command on the DB directly (ex RAC)
-if [ -f bin/deploy_db_node.sh ]; then
+if [ -f $BIN_DIR/deploy_db_node.sh ]; then
   title "Deploy DB Node"
   $BIN_DIR/deploy_db_node.sh
 fi 
@@ -45,7 +55,7 @@ fi
 # Init target/compute
 if is_deploy_compute; then
     mkdir -p target/compute
-    cp src/compute/* target/compute/.
+    cp -r src/compute target/compute/.
 fi
 
 # Build all app* directories
@@ -63,14 +73,13 @@ fi
 
 # Deploy
 title "Deploy $TF_VAR_deploy_type"
-if [ "$TF_VAR_deploy_type" == "compute" ]; then
+if [ "$TF_VAR_deploy_type" == "public_compute" ] || [ "$TF_VAR_deploy_type" == "private_compute" ]; then
     $BIN_DIR/deploy_compute.sh
     exit_on_error
 elif [ "$TF_VAR_deploy_type" == "instance_pool" ]; then
     $BIN_DIR/deploy_compute.sh
-    exit_on_error
     export TF_VAR_compute_ready="true"
-    src/terraform/apply.sh --auto-approve -no-color
+    $BIN_DIR/terraform_apply.sh --auto-approve -no-color
     exit_on_error
 elif [ "$TF_VAR_deploy_type" == "kubernetes" ]; then
     $BIN_DIR/oke_deploy.sh
@@ -87,6 +96,7 @@ fi
 
 $BIN_DIR/add_api_portal.sh
 
+# Custom code after build
 if [ -f $PROJECT_DIR/src/after_build.sh ]; then
   $PROJECT_DIR/src/after_build.sh
 fi

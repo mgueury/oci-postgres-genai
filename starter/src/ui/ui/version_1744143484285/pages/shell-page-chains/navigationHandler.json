@@ -1,0 +1,55 @@
+{
+  "description": "Navigates to the flow selected in the navigation tab.",
+  "variables": {
+    "item": {
+      "required": true,
+      "type": "string",
+      "input": "fromCaller"
+    },
+    "updatedFrom": {
+      "type": "string",
+      "input": "fromCaller"
+    }
+  },
+  "root": "test",
+  "actions": {
+    "test": {
+      "module": "vb/action/builtin/ifAction",
+      "parameters": {
+        "condition": "{{ $variables.updatedFrom !== 'external' }}"
+      },
+      "outcomes": {
+        "true": "switch1"
+      }
+    },
+    "switch1": {
+      "module": "vb/action/builtin/switchAction",
+      "outcomes": {
+        "simple": "navigateToPage0",
+        "advanced": "navigateToPage1",
+        "other": "navigateToPage2"
+      },
+      "parameters": {
+        "caseValue": "{{ $chain.variables.item }}"
+      }
+    },
+    "navigateToPage0": {
+      "module": "vb/action/builtin/navigateAction",
+      "parameters": {
+        "page": "shell/simple"
+      }
+    },
+    "navigateToPage1": {
+      "module": "vb/action/builtin/navigateAction",
+      "parameters": {
+        "page": "shell/advanced"
+      }
+    },
+    "navigateToPage2": {
+      "module": "vb/action/builtin/navigateAction",
+      "parameters": {
+        "page": "shell/other"
+      }
+    }
+  }
+}

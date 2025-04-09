@@ -1,13 +1,11 @@
 #!/bin/bash
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-cd $SCRIPT_DIR/..
-. env.sh -silent
+if [ "$PROJECT_DIR" == "" ]; then
+  echo "ERROR: PROJECT_DIR undefined. Please use starter.sh deploy compute"
+  exit 1
+fi  
+cd $PROJECT_DIR
+. starter.sh env -silent
 
-# Using RSYNC allow to reapply the same command several times easily
-if command -v rsync &> /dev/null
-then
-  rsync -av -e "ssh -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path" target/compute/* opc@$COMPUTE_IP:.
-else
-  scp -r -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path target/compute/* opc@$COMPUTE_IP:/home/opc/.
-fi
-ssh -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path opc@$COMPUTE_IP "export TF_VAR_java_version=\"$TF_VAR_java_version\";export TF_VAR_java_vm=\"$TF_VAR_java_vm\";export TF_VAR_language=\"$TF_VAR_language\";export JDBC_URL=\"$JDBC_URL\";export DB_URL=\"$DB_URL\";export DB_USER=\"$TF_VAR_db_user\";export DB_PASSWORD=\"$TF_VAR_db_password\";export TF_VAR_namespace=\"$TF_VAR_namespace\";export TF_VAR_prefix=\"$TF_VAR_prefix\";bash compute_bootstrap.sh 2>&1 | tee -a compute_bootstrap.log"
+scp_via_bastion "target/compute/*" opc@$COMPUTE_IP:/home/opc/.
+ssh -o StrictHostKeyChecking=no -oProxyCommand="$BASTION_PROXY_COMMAND" opc@$COMPUTE_IP "export TF_VAR_java_version=\"$TF_VAR_java_version\";export TF_VAR_java_vm=\"$TF_VAR_java_vm\";export TF_VAR_language=\"$TF_VAR_language\";export JDBC_URL=\"$JDBC_URL\";export DB_URL=\"$DB_URL\";bash compute/compute_init.sh 2>&1 | tee -a compute/compute_init.log"
+exit_on_error

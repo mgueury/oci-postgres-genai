@@ -1,0 +1,10 @@
+{
+  "id": "simple",
+  "description": "Flow main",
+  "defaultPage": "input-search",
+  "services": {},
+  "types": {
+
+  },
+  "variables": {}
+}

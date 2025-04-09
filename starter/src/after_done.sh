@@ -3,7 +3,7 @@ export SRC_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pw
 export ROOT_DIR=${SRC_DIR%/*}
 cd $ROOT_DIR
 
-. ./env.sh
+. ./starter.sh env
 
 get_attribute_from_tfstate "STREAM_OCID" "starter_stream" "id"
 get_attribute_from_tfstate "TENANCY_NAME" "tenant_details" "name"
@@ -38,7 +38,10 @@ echo "-- AGENT (OPTIONAL) ---------------------------"
 echo "AGENT_DATASOURCE_OCID=$AGENT_DATASOURCE_OCID"
 
 # Deploy compute simplified
+mkdir -p $TARGET_DIR/compute
 cp -r src/compute/* $TARGET_DIR/compute/.
+mkdir -p $TARGET_DIR/compute/ui
+cp -r src/ui/ui/* $TARGET_DIR/compute/ui/.
 scp -r -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path $TARGET_DIR/compute/* opc@$BASTION_IP:/home/opc/.
 ssh -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path opc@$BASTION_IP "export TF_VAR_language=python;export AGENT_DATASOURCE_OCID=$AGENT_DATASOURCE_OCID;export FN_INVOKE_ENDPOINT=\"$FN_INVOKE_ENDPOINT\";export FN_OCID=\"$FN_OCID\";export STREAM_MESSAGE_ENDPOINT=\"$STREAM_MESSAGE_ENDPOINT\";export STREAM_OCID=\"$STREAM_OCID\";export DB_USER=\"$TF_VAR_db_user\";export DB_PASSWORD=\"$TF_VAR_db_password\";export DB_URL=\"$DB_URL\"; bash compute_bootstrap.sh 2>&1 | tee -a compute_bootstrap.log"
 

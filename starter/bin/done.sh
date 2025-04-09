@@ -3,9 +3,9 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR/..
 
 if [ -z "$TF_VAR_deploy_type" ]; then
-  . ./env.sh -silent
+  . starter.sh env -silent
 else
-  . bin/shared_bash_function.sh
+  . starter.sh env -no-auto
 fi 
 
 get_ui_url
@@ -53,14 +53,17 @@ if [ ! -z "$UI_URL" ]; then
     fi  
     curl $UI_URL/app/info -b /tmp/cookie.txt -c /tmp/cookie.txt -L --retry 5 --retry-max-time 20 -D /tmp/result_info.log > /tmp/result.info
 
-    if [ "$TF_VAR_deploy_type" == "compute" ]; then
+    if [ "$TF_VAR_deploy_type" == "public_compute" ] || [ "$TF_VAR_deploy_type" == "private_compute" ]; then
       # Get the compute logs
-      scp -r -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path opc@$COMPUTE_IP:/home/opc/*.log target/.
-      scp -r -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path opc@$COMPUTE_IP:/home/opc/app/*.log target/.
+      eval "$(ssh-agent -s)"      
+      ssh-add $TF_VAR_ssh_private_path
+      scp -r -o StrictHostKeyChecking=no -oProxyCommand="$BASTION_PROXY_COMMAND" opc@$COMPUTE_IP:/home/opc/compute/*.log target/.
+      scp -r -o StrictHostKeyChecking=no -oProxyCommand="$BASTION_PROXY_COMMAND" opc@$COMPUTE_IP:/home/opc/*.log target/.
+      scp -r -o StrictHostKeyChecking=no -oProxyCommand="$BASTION_PROXY_COMMAND" opc@$COMPUTE_IP:/home/opc/app/*.log target/.
       if [ "$TF_VAR_language" == "java" ]; then
         if [ "$TF_VAR_java_framework" == "tomcat" ]; then
-            ssh -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path opc@$COMPUTE_IP "sudo cp -r /opt/tomcat/logs /tmp/tomcat_logs; sudo chown -R opc /tmp/tomcat_logs"
-            scp -r -o StrictHostKeyChecking=no -i $TF_VAR_ssh_private_path opc@$COMPUTE_IP:/tmp/tomcat_logs target/.
+            ssh -o StrictHostKeyChecking=no -oProxyCommand="$BASTION_PROXY_COMMAND" opc@$COMPUTE_IP "sudo cp -r /opt/tomcat/logs /tmp/tomcat_logs; sudo chown -R opc /tmp/tomcat_logs"
+            scp -r -o StrictHostKeyChecking=no -oProxyCommand="$BASTION_PROXY_COMMAND" opc@$COMPUTE_IP:/tmp/tomcat_logs target/.
         fi
       fi
     fi 
@@ -78,12 +81,26 @@ if [ ! -z "$UI_URL" ]; then
     # echo - Rest DB API     : $UI_URL/$APP_DIR/dept
     # echo - Rest Info API   : $UI_URL/$APP_DIR/info
   done
-  if [ "$TF_VAR_deploy_type" == "compute" ] && [ "$TF_VAR_ui_type" == "api" ]; then   
+  if [[ ("$TF_VAR_deploy_type" == "public_compute" || "$TF_VAR_deploy_type" == "private_compute") && "$TF_VAR_ui_type" == "api" ]]; then   
     export APIGW_URL=https://${APIGW_HOSTNAME}/${TF_VAR_prefix}  
     echo - API Gateway URL : $APIGW_URL/app/dept 
   fi
   if [ "$TF_VAR_language" == "java" ] && [ "$TF_VAR_java_framework" == "springboot" ] && [ "$TF_VAR_ui_type" == "html" ] && [ "$TF_VAR_db_node_count" == "2" ]; then
     echo - RAC Page        : $UI_URL/rac.html
+  fi
+  if [ "$TF_VAR_language" == "apex" ]; then
+    echo "-----------------------------------------------------------------------"
+    echo "APEX login:"
+    echo
+    echo "APEX Workspace"
+    echo "$UI_URL/ords/_/landing"
+    echo "  Workspace: APEX_APP"
+    echo "  User: APEX_APP"
+    echo "  Password: $TF_VAR_db_password"
+    echo
+    echo "APEX APP"
+    echo "$UI_URL/ords/r/apex_app/apex_app/"
+    echo "  User: APEX_APP / $TF_VAR_db_password"
   fi
 fi
 

@@ -1,0 +1,127 @@
+{
+  "title": "Message",
+  "description": "Document",
+  "variables": {
+    "backgroundColor": {
+      "type": "string",
+      "defaultValue": "dark-ocean"
+    },
+    "chatHistory": {
+      "type": "chatHistoryType[]"
+    },
+    "chatHistoryADP": {
+      "type": "vb/ArrayDataProvider2",
+      "defaultValue": {
+        "data": "{{ $variables.chatHistory }}",
+        "itemType": "chatHistoryType",
+        "keyAttributes": [
+          "message",
+          "role"
+        ]
+      },
+      "@dt": {
+        "label": "History"
+      }
+    },
+    "contentType": {
+      "type": "string",
+      "input": "fromCaller"
+    },
+    "documentPath": {
+      "type": "string",
+      "defaultValue": "/n/fr03kzmuvhtf/b/psql-public-bucket/o/jazz.pdf",
+      "input": "fromCaller"
+    },
+    "error": {
+      "type": "string"
+    },
+    "filename": {
+      "type": "string",
+      "input": "fromCaller"
+    },
+    "iframeUrl": {
+      "type": "string",
+      "input": "fromCaller"
+    },
+    "illustrationBackground": {
+      "type": "string",
+      "defaultValue": "https://static.oracle.com/cdn/fnd/gallery/2307.0.2/images/illust-welcome-banner-bg-01.png"
+    },
+    "illustrationForeground": {
+      "type": "string",
+      "defaultValue": "resources/images/AIflower.png"
+    },
+    "imageStretch": {
+      "type": "string",
+      "defaultValue": "none"
+    },
+    "message": {
+      "type": "string"
+    },
+    "mobileImage": {
+      "type": "string",
+      "defaultValue": "on"
+    }
+
+  },
+  "metadata": {},
+  "types": {
+    "chatHistoryType": {
+      "message": "string",
+      "role": "string"
+    }
+  },
+  "eventListeners": {
+    "buttonAction": {
+      "chains": [
+        {
+          "chain": "chatActionChain"
+        }
+      ]
+    },
+    "buttonAction2": {
+      "chains": [
+        {
+          "chain": "clearActionChain"
+        }
+      ]
+    },
+    "inputTextValue": {
+      "chains": [
+        {
+          "chain": "InputTextValueChangeChain",
+          "parameters": {
+            "value": "{{ $event.detail.value }}"
+          }
+        }
+      ]
+    },
+    "ojSpWp1SpPrimaryAction": {
+      "chains": [
+        {
+          "chain": "WelcomePageTemplateSpPrimaryActionChain"
+        }
+      ]
+    }
+
+  },
+  "imports": {
+    "components": {
+      "oj-button": {
+        "path": "ojs/ojbutton"
+      },
+      "oj-input-text": {
+        "path": "ojs/ojinputtext"
+      },
+      "oj-list-item-layout": {
+        "path": "ojs/ojlistitemlayout"
+      },
+      "oj-list-view": {
+        "path": "ojs/ojlistview"
+      },
+      "oj-sp-welcome-page": {
+        "path": "oj-sp/welcome-page/loader"
+      }
+    }
+  }
+}

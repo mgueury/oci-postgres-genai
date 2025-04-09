@@ -1,0 +1,14 @@
+{
+  "root": "callFunctionToggleDrawer",
+  "description": "Toggles the navigation drawer for the page",
+  "variables": {},
+  "actions": {
+    "callFunctionToggleDrawer": {
+      "module": "vb/action/builtin/callModuleFunctionAction",
+      "parameters": {
+        "module": "[[ $functions ]]",
+        "functionName": "toggleDrawer"
+      }
+    }
+  }
+}
