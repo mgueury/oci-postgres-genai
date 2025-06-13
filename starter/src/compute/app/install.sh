@@ -4,9 +4,15 @@ cd $SCRIPT_DIR
 
 # Python Server
 sudo yum -y install postgresql-devel
-sudo dnf install -y python39 python39-devel
-sudo pip3.9 install pip --upgrade
-pip3.9 install -r requirements.txt
+sudo dnf install -y python3.12 python3.12-pip python3-devel
+sudo pip3.12 install pip --upgrade
+
+# Install virtual env python_env
+python3.12 -m venv myenv
+source myenv/bin/activate
+pip3 install --upgrade pip
+pip3 install -r requirements.txt
+
 
 # PDFKIT
 wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox-0.12.6-1.centos8.x86_64.rpm

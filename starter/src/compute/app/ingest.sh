@@ -4,4 +4,5 @@ cd $SCRIPT_DIR
 
 . ./env.sh
 
-python3.9 ingest.py 2>&1 | tee ingest.log
+source myenv/bin/activate
+python3.12 ingest.py 2>&1 | tee ingest.log
